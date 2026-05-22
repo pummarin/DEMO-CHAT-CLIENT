@@ -286,45 +286,50 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </p>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`message-bubble-wrapper ${
-                msg.sender === 'user' ? 'user-wrapper' : 'agent-wrapper'
-              }`}
-            >
-              <div className="sender-avatar">
-                {msg.sender === 'user' ? (
-                  <User size={14} />
-                ) : (
-                  <Bot size={14} className="agent-avatar-icon" />
-                )}
-              </div>
-
-              <div className="message-bubble-content">
-                <div className="message-header-info">
-                  <span className="sender-name">
-                    {msg.sender === 'user' ? 'You' : msg.agent_name || 'Agent'}
-                  </span>
-                  <span className="timestamp">
-                    {msg.created_at
-                      ? new Date(msg.created_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : ''}
-                  </span>
+          messages.map((msg) => {
+            if (msg.id.startsWith('temp-') && !msg.content) {
+              return null;
+            }
+            return (
+              <div
+                key={msg.id}
+                className={`message-bubble-wrapper ${
+                  msg.sender === 'user' ? 'user-wrapper' : 'agent-wrapper'
+                }`}
+              >
+                <div className="sender-avatar">
+                  {msg.sender === 'user' ? (
+                    <User size={14} />
+                  ) : (
+                    <Bot size={14} className="agent-avatar-icon" />
+                  )}
                 </div>
 
-                <div className="message-bubble">
-                  <Markdown content={msg.content} />
+                <div className="message-bubble-content">
+                  <div className="message-header-info">
+                    <span className="sender-name">
+                      {msg.sender === 'user' ? 'You' : msg.agent_name || 'Agent'}
+                    </span>
+                    <span className="timestamp">
+                      {msg.created_at
+                        ? new Date(msg.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : ''}
+                    </span>
+                  </div>
+
+                  <div className="message-bubble">
+                    <Markdown content={msg.content} />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
 
-        {isGenerating && (
+        {isGenerating && !messages.some((m) => m.id.startsWith('temp-') && m.content.length > 0) && (
           <div className="message-bubble-wrapper agent-wrapper generating">
             <div className="sender-avatar">
               <Bot size={14} className="agent-avatar-icon rotate-anim" />

@@ -31,7 +31,7 @@ export default function App() {
         if (defaultRoleChats.length > 0) {
           setCurrentChatId(defaultRoleChats[0].id);
         } else {
-          setCurrentChatId(loadedChats[0].id);
+          setCurrentChatId(null);
         }
       }
     };
@@ -136,12 +136,17 @@ export default function App() {
   // Delete chat session
   const handleDeleteChat = async (id: string) => {
     await dbService.deleteChat(id);
-    setChats((prev) => prev.filter((c) => c.id !== id));
     
-    if (currentChatId === id) {
-      const remainingChats = chats.filter((c) => c.id !== id && (c.role === currentRole || (!c.role && currentRole === 'staff')));
-      setCurrentChatId(remainingChats.length > 0 ? remainingChats[0].id : null);
-    }
+    setChats((prev) => {
+      const updatedChats = prev.filter((c) => c.id !== id);
+      if (currentChatId === id) {
+        const remainingChats = updatedChats.filter(
+          (c) => c.role === currentRole || (!c.role && currentRole === 'staff')
+        );
+        setCurrentChatId(remainingChats.length > 0 ? remainingChats[0].id : null);
+      }
+      return updatedChats;
+    });
   };
 
   // Clear message history in the current chat
@@ -190,19 +195,32 @@ export default function App() {
   const queryAgentAPI = async (
     agent: Agent,
     history: Message[],
-    userMessageText: string
+    userMessageText: string,
+    onChunk?: (text: string) => void
   ): Promise<string> => {
     const { api_provider, api_endpoint, api_key, model_name, system_instruction } = agent;
 
     if (api_provider === 'mock') {
       // Mock Simulation response
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       const mockResponses = [
         `I am **${agent.name}** (API Provider: Mock). I received your message: "${userMessageText}".\n\nHere is a list of things we can test:\n* Chat persistence\n* Switching agents mid-chat (try picking another agent in the header!)\n* Custom system prompts\n\n\`\`\`javascript\nconsole.log("Mock Response Executed Successfully!");\n\`\`\``,
         `Hello there! This is a mock response simulated locally inside your browser.\n\nTo query a live AI model, click the **Edit** icon next to this agent in the sidebar, input a valid **Gemini** or **OpenAI** API key, and click save.`,
         `Understood! My system prompt is: \`"${system_instruction || 'None'}"\`.\n\nLet me know if there's anything else you would like to mock!`,
       ];
-      return mockResponses[Math.floor(Math.random() * mockResponses.length)];
+      const text = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+      if (onChunk) {
+        const words = text.split(' ');
+        let accumulated = '';
+        for (let i = 0; i < words.length; i++) {
+          const chunk = words[i] + (i === words.length - 1 ? '' : ' ');
+          accumulated += chunk;
+          onChunk(chunk);
+          await new Promise((resolve) => setTimeout(resolve, 60));
+        }
+        return accumulated;
+      }
+      return text;
     }
 
     if (!api_key) {
@@ -316,7 +334,12 @@ export default function App() {
 
     // 3. SOFTNIX AI API CALL
     if (api_provider === 'softnix') {
-      const endpointUrl = api_endpoint || 'https://genai.softnix.ai/external/api/chat-messages';
+      let endpointUrl = api_endpoint || 'https://genai.softnix.ai/external/api/chat-messages';
+
+      // Proxy default Softnix URLs to avoid CORS errors in browser/Netlify
+      if (endpointUrl.startsWith('https://genai.softnix.ai/external/api')) {
+        endpointUrl = endpointUrl.replace('https://genai.softnix.ai/external/api', '/api/softnix');
+      }
 
       const response = await fetch(endpointUrl, {
         method: 'POST',
@@ -329,7 +352,7 @@ export default function App() {
           inputs: {},
           files: [],
           citation: true,
-          response_mode: 'blocking',
+          response_mode: onChunk ? 'streaming' : 'blocking',
         }),
       });
 
@@ -338,13 +361,53 @@ export default function App() {
         throw new Error(errJson.message || errJson.error || `HTTP ${response.status} Error`);
       }
 
-      const resJson = await response.json();
-      // Softnix (Dify-compatible) blocking response returns { answer: "..." }
-      const text = resJson.answer || resJson.text || resJson.message;
-      if (!text) {
-        throw new Error('Received empty response from Softnix API.');
+      if (onChunk && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep the last incomplete line in the buffer
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            if (trimmed.startsWith('data:')) {
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr === '[DONE]') continue;
+
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.event === 'message' && data.answer) {
+                  fullText += data.answer;
+                  onChunk(data.answer);
+                }
+              } catch (e) {
+                // Ignore parsing errors for partial/incomplete lines
+              }
+            }
+          }
+        }
+        
+        if (!fullText) {
+          throw new Error('Received empty response from Softnix API.');
+        }
+        return fullText;
+      } else {
+        const resJson = await response.json();
+        const text = resJson.answer || resJson.text || resJson.message;
+        if (!text) {
+          throw new Error('Received empty response from Softnix API.');
+        }
+        return text;
       }
-      return text;
     }
 
     throw new Error(`Unsupported API Provider: ${api_provider}`);
@@ -365,9 +428,32 @@ export default function App() {
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
 
+    // Create a temporary message placeholder for the streaming response
+    const tempAgentMsgId = 'temp-' + Date.now();
+    const placeholderMsg: Message = {
+      id: tempAgentMsgId,
+      chat_id: currentChatId,
+      sender: 'agent',
+      agent_id: activeAgent.id,
+      agent_name: activeAgent.name,
+      content: '',
+      created_at: new Date().toISOString(),
+    };
+
+    // Render the placeholder message
+    setMessages((prev) => [...prev, placeholderMsg]);
+
     try {
-      // 2. Query Agent API
-      const replyText = await queryAgentAPI(activeAgent, messages, text);
+      // 2. Query Agent API with chunk callback
+      let streamedContent = '';
+      const replyText = await queryAgentAPI(activeAgent, messages, text, (chunk) => {
+        streamedContent += chunk;
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempAgentMsgId ? { ...msg, content: streamedContent } : msg
+          )
+        );
+      });
 
       // 3. Save Agent response
       const agentMsg = await dbService.saveMessage({
@@ -378,8 +464,10 @@ export default function App() {
         content: replyText,
       });
 
-      // Update message list
-      setMessages((prev) => [...prev, agentMsg]);
+      // Update message list, replacing the temp placeholder with the saved message
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === tempAgentMsgId ? agentMsg : msg))
+      );
 
       // If this was the first message in the conversation, rename the chat title!
       if (messages.length === 0 && currentChat) {
@@ -393,6 +481,9 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
+
+      // Remove the temporary message placeholder on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempAgentMsgId));
 
       // Save error message to thread
       const errMsg = await dbService.saveMessage({
