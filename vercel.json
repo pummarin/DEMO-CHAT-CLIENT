@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/softnix/:path*",
+      "destination": "https://genai.softnix.ai/external/api/:path*"
+    }
+  ]
+}
