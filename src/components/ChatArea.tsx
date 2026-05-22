@@ -189,7 +189,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="chat-empty-container">
         <div className="chat-empty-card glass-card">
           <Bot className="bot-huge-icon" size={48} />
-          <h2>Welcome to Antigravity Chat</h2>
+          <h2>Welcome to Demo Chat</h2>
           <p>Create a conversation or configure an AI agent from the sidebar to begin.</p>
         </div>
       </div>

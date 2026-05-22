@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS public.agents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    api_provider TEXT NOT NULL CHECK (api_provider IN ('gemini', 'openai', 'custom', 'mock')),
+    api_provider TEXT NOT NULL CHECK (api_provider IN ('gemini', 'openai', 'custom', 'mock', 'softnix')),
     api_endpoint TEXT,
     api_key TEXT,
     model_name TEXT,
@@ -53,3 +53,26 @@ VALUES (
     'mock-v1',
     'You are a helpful Mock Agent that simulates responses to help test the UI.'
 ) ON CONFLICT DO NOTHING;
+
+-- ============================================================
+-- MIGRATION: Run these commands if the table already exists
+-- (to add 'softnix' to the provider constraint and update the agent)
+-- ============================================================
+
+-- Step 1: Drop old CHECK constraint (name may vary; use the query below to find it)
+-- SELECT conname FROM pg_constraint WHERE conrelid = 'public.agents'::regclass AND contype = 'c';
+ALTER TABLE public.agents DROP CONSTRAINT IF EXISTS agents_api_provider_check;
+
+-- Step 2: Add updated CHECK constraint with 'softnix' included
+ALTER TABLE public.agents
+  ADD CONSTRAINT agents_api_provider_check
+  CHECK (api_provider IN ('gemini', 'openai', 'custom', 'mock', 'softnix'));
+
+-- Step 3: Update the Softnix AI Agent record to use the correct provider
+UPDATE public.agents
+SET
+  api_provider = 'softnix',
+  name         = 'Softnix AI Agent'
+WHERE
+  api_endpoint = 'https://genai.softnix.ai/external/api/chat-messages'
+  AND api_provider = 'custom';

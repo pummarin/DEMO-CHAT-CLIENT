@@ -208,7 +208,7 @@ export default function App() {
       return text;
     }
 
-    // 2. OPENAI OR CUSTOM COMPATIBLE API CALL
+    // 2. OPENAI COMPATIBLE API CALL
     if (api_provider === 'openai' || api_provider === 'custom') {
       const endpointUrl = `${
         api_endpoint || 'https://api.openai.com/v1'
@@ -263,7 +263,40 @@ export default function App() {
       return text;
     }
 
-    throw new Error('Unsupported API Provider');
+    // 3. SOFTNIX AI API CALL
+    if (api_provider === 'softnix') {
+      const endpointUrl = api_endpoint || 'https://genai.softnix.ai/external/api/chat-messages';
+
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${api_key}`,
+        },
+        body: JSON.stringify({
+          query: userMessageText,
+          inputs: {},
+          files: [],
+          citation: true,
+          response_mode: 'blocking',
+        }),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || errJson.error || `HTTP ${response.status} Error`);
+      }
+
+      const resJson = await response.json();
+      // Softnix (Dify-compatible) blocking response returns { answer: "..." }
+      const text = resJson.answer || resJson.text || resJson.message;
+      if (!text) {
+        throw new Error('Received empty response from Softnix API.');
+      }
+      return text;
+    }
+
+    throw new Error(`Unsupported API Provider: ${api_provider}`);
   };
 
   // Send message handler

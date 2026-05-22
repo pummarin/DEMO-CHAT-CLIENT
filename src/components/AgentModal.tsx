@@ -33,6 +33,9 @@ export const AgentModal: React.FC<AgentModalProps> = ({
     } else if (provider === 'openai') {
       setEndpoint('https://api.openai.com/v1');
       setModel('gpt-4o-mini');
+    } else if (provider === 'softnix') {
+      setEndpoint('https://genai.softnix.ai/external/api/chat-messages');
+      setModel('');
     } else if (provider === 'mock') {
       setEndpoint('');
       setModel('mock-model-v1');
@@ -128,6 +131,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               >
                 <option value="gemini">Gemini API</option>
                 <option value="openai">OpenAI API</option>
+                <option value="softnix">Softnix AI (genai.softnix.ai)</option>
                 <option value="custom">Custom Endpoint (OpenAI Compatible)</option>
                 <option value="mock">Local Simulation (Mock)</option>
               </select>
@@ -137,9 +141,14 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               <label>Model Name</label>
               <input
                 type="text"
-                placeholder={provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini'}
+                placeholder={
+                  provider === 'gemini' ? 'gemini-1.5-flash' :
+                  provider === 'softnix' ? 'N/A' :
+                  'gpt-4o-mini'
+                }
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
+                disabled={provider === 'softnix'}
               />
             </div>
           </div>
@@ -286,10 +295,19 @@ export const AgentModal: React.FC<AgentModalProps> = ({
           text-transform: uppercase;
         }
 
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+        }
+
         .form-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 16px;
+          align-items: end;
         }
 
         @media (max-width: 480px) {

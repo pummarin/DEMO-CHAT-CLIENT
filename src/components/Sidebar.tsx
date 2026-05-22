@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="logo-area">
           <div className="logo-glow"></div>
           <Bot className="logo-icon" size={24} />
-          <h1>Antigravity Chat</h1>
+          <h1>Demo Chat</h1>
         </div>
         <button className="btn-primary new-chat-btn" onClick={onCreateChat}>
           <Plus size={16} />

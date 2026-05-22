@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 export interface Agent {
   id: string;
   name: string;
-  api_provider: 'gemini' | 'openai' | 'custom' | 'mock';
+  api_provider: 'gemini' | 'openai' | 'custom' | 'mock' | 'softnix';
   api_endpoint?: string;
   api_key?: string;
   model_name?: string;
