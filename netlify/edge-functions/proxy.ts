@@ -7,9 +7,19 @@ export default async (request: Request) => {
   
   const targetUrl = `https://genai.softnix.ai/external/api${pathSuffix}${url.search}`;
   
-  // Clone request headers and set host to target
-  const headers = new Headers(request.headers);
+  // Build clean headers to avoid forwarding browser/proxy specific headers
+  const headers = new Headers();
   headers.set("host", "genai.softnix.ai");
+  
+  const authHeader = request.headers.get("authorization");
+  if (authHeader) {
+    headers.set("authorization", authHeader);
+  }
+  
+  const contentTypeHeader = request.headers.get("content-type");
+  if (contentTypeHeader) {
+    headers.set("content-type", contentTypeHeader);
+  }
   
   const fetchOptions: RequestInit = {
     method: request.method,
@@ -17,7 +27,8 @@ export default async (request: Request) => {
   };
   
   if (request.method !== "GET" && request.method !== "HEAD") {
-    fetchOptions.body = request.body;
+    // Read body as text instead of passing the stream directly to avoid Deno stream-forwarding bugs
+    fetchOptions.body = await request.text();
   }
   
   try {

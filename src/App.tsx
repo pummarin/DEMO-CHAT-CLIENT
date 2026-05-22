@@ -9,7 +9,7 @@ export default function App() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  
+
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,7 +42,7 @@ export default function App() {
   useEffect(() => {
     let isCurrent = true;
     setMessages([]); // Clear messages immediately to avoid showing old chat history
-    
+
     if (currentChatId) {
       const loadMessages = async () => {
         const loadedMessages = await dbService.getMessages(currentChatId);
@@ -76,7 +76,7 @@ export default function App() {
   // Handle role switching
   const handleRoleChange = (role: 'staff' | 'manager' | 'director') => {
     setCurrentRole(role);
-    
+
     // Auto-select the first conversation of the new role (if exists)
     const roleChats = chats.filter((c) => c.role === role || (!c.role && role === 'staff'));
     if (roleChats.length > 0) {
@@ -86,10 +86,10 @@ export default function App() {
     }
 
     // Role-specific theme colors for the confetti burst
-    const colors = 
+    const colors =
       role === 'staff' ? ['#06b6d4', '#3b82f6'] :
-      role === 'manager' ? ['#10b981', '#84cc16'] :
-      ['#d946ef', '#f43f5e'];
+        role === 'manager' ? ['#10b981', '#84cc16'] :
+          ['#d946ef', '#f43f5e'];
 
     confetti({
       particleCount: 30,
@@ -105,15 +105,15 @@ export default function App() {
     const currentRoleChats = chats.filter((c) => c.role === currentRole || (!c.role && currentRole === 'staff'));
     const title = `New Session ${currentRoleChats.length + 1}`;
     const newChat = await dbService.createChat(title, defaultAgent?.id, currentRole);
-    
+
     setChats((prev) => [newChat, ...prev]);
     setCurrentChatId(newChat.id);
 
     // Dynamic confetti colors based on role
-    const colors = 
+    const colors =
       currentRole === 'staff' ? ['#06b6d4', '#3b82f6'] :
-      currentRole === 'manager' ? ['#10b981', '#84cc16'] :
-      ['#d946ef', '#f43f5e'];
+        currentRole === 'manager' ? ['#10b981', '#84cc16'] :
+          ['#d946ef', '#f43f5e'];
 
     confetti({
       particleCount: 50,
@@ -127,7 +127,7 @@ export default function App() {
   const handleSelectAgent = async (agentId: string) => {
     if (!currentChatId) return;
     await dbService.updateChatAgent(currentChatId, agentId);
-    
+
     setChats((prev) =>
       prev.map((c) => (c.id === currentChatId ? { ...c, active_agent_id: agentId } : c))
     );
@@ -136,7 +136,7 @@ export default function App() {
   // Delete chat session
   const handleDeleteChat = async (id: string) => {
     await dbService.deleteChat(id);
-    
+
     setChats((prev) => {
       const updatedChats = prev.filter((c) => c.id !== id);
       if (currentChatId === id) {
@@ -155,11 +155,11 @@ export default function App() {
     // Simple custom prompt check
     if (window.confirm('Are you sure you want to clear all messages in this conversation?')) {
       await dbService.deleteChat(currentChatId); // Cascading deletes messages
-      
+
       // Re-create the chat with the same title and agent to refresh
       const title = currentChat?.title || 'Chat';
       const agentId = currentChat?.active_agent_id;
-      
+
       const newChat = await dbService.createChat(title, agentId, currentRole);
       setChats((prev) => prev.map((c) => (c.id === currentChatId ? newChat : c)));
       setCurrentChatId(newChat.id);
@@ -229,9 +229,8 @@ export default function App() {
 
     // 1. GEMINI API CALL
     if (api_provider === 'gemini') {
-      const endpointUrl = `${
-        api_endpoint || 'https://generativelanguage.googleapis.com/v1beta'
-      }/models/${model_name || 'gemini-1.5-flash'}:generateContent?key=${api_key}`;
+      const endpointUrl = `${api_endpoint || 'https://generativelanguage.googleapis.com/v1beta'
+        }/models/${model_name || 'gemini-1.5-flash'}:generateContent?key=${api_key}`;
 
       // Format history into Gemini API roles: 'user' and 'model'
       const formattedContents = history.map((m) => ({
@@ -279,9 +278,8 @@ export default function App() {
 
     // 2. OPENAI COMPATIBLE API CALL
     if (api_provider === 'openai' || api_provider === 'custom') {
-      const endpointUrl = `${
-        api_endpoint || 'https://api.openai.com/v1'
-      }/chat/completions`;
+      const endpointUrl = `${api_endpoint || 'https://api.openai.com/v1'
+        }/chat/completions`;
 
       const formattedMessages = [];
 
@@ -352,7 +350,8 @@ export default function App() {
           inputs: {},
           files: [],
           citation: true,
-          response_mode: onChunk ? 'streaming' : 'blocking',
+          // response_mode: onChunk ? 'streaming' : 'blocking',
+          response_mode: 'blocking',
         }),
       });
 
@@ -378,7 +377,7 @@ export default function App() {
           for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-            
+
             if (trimmed.startsWith('data:')) {
               const dataStr = trimmed.slice(5).trim();
               if (dataStr === '[DONE]') continue;
@@ -395,7 +394,7 @@ export default function App() {
             }
           }
         }
-        
+
         if (!fullText) {
           throw new Error('Received empty response from Softnix API.');
         }
