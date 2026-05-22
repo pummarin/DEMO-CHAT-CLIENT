@@ -340,7 +340,7 @@ export default function App() {
       }
 
       // Toggle this flag to switch between streaming and blocking modes
-      const useStreaming = false;
+      const useStreaming = true;
 
       const response = await fetch(endpointUrl, {
         method: 'POST',
