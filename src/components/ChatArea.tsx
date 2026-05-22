@@ -11,6 +11,7 @@ interface ChatAreaProps {
   onSendMessage: (text: string) => void;
   onChangeAgent: (agentId: string) => void;
   onClearHistory: () => void;
+  currentRole: 'staff' | 'manager' | 'director';
 }
 
 // A simple Markdown component to render LLM responses nicely
@@ -147,6 +148,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSendMessage,
   onChangeAgent,
   onClearHistory,
+  currentRole,
 }) => {
   const [input, setInput] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -185,12 +187,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   }, [input]);
 
   if (!chat) {
+    const emptyStateDetails = {
+      staff: {
+        title: 'Staff Workspace',
+        desc: 'Collaborate with your Staff Assistant on operational tasks, software engineering, technical documentation, and daily duties.',
+      },
+      manager: {
+        title: 'Manager Workspace',
+        desc: 'Coordinate with your Manager Assistant on project timelines, resource scheduling, task delegation, and progress reporting.',
+      },
+      director: {
+        title: 'Director Workspace',
+        desc: 'Consult with your Director Assistant on business strategy, organizational vision, financial forecasting, and leadership planning.',
+      },
+    };
+
+    const details = emptyStateDetails[currentRole];
+
     return (
       <div className="chat-empty-container">
         <div className="chat-empty-card glass-card">
           <Bot className="bot-huge-icon" size={48} />
-          <h2>Welcome to Demo Chat</h2>
-          <p>Create a conversation or configure an AI agent from the sidebar to begin.</p>
+          <h2>Welcome to {details.title}</h2>
+          <p>{details.desc}</p>
         </div>
       </div>
     );

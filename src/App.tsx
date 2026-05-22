@@ -14,6 +14,7 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [currentRole, setCurrentRole] = useState<'staff' | 'manager' | 'director'>('staff');
 
   // Load initial data
   useEffect(() => {
@@ -25,7 +26,13 @@ export default function App() {
       setChats(loadedChats);
 
       if (loadedChats.length > 0) {
-        setCurrentChatId(loadedChats[0].id);
+        // Find first chat of the default role (staff)
+        const defaultRoleChats = loadedChats.filter((c) => c.role === 'staff' || !c.role);
+        if (defaultRoleChats.length > 0) {
+          setCurrentChatId(defaultRoleChats[0].id);
+        } else {
+          setCurrentChatId(loadedChats[0].id);
+        }
       }
     };
     initData();
@@ -33,22 +40,30 @@ export default function App() {
 
   // Load messages whenever current chat changes
   useEffect(() => {
+    let isCurrent = true;
+    setMessages([]); // Clear messages immediately to avoid showing old chat history
+    
     if (currentChatId) {
       const loadMessages = async () => {
         const loadedMessages = await dbService.getMessages(currentChatId);
-        setMessages(loadedMessages);
+        if (isCurrent) {
+          setMessages(loadedMessages);
+        }
       };
       loadMessages();
-    } else {
-      setMessages([]);
     }
+
+    return () => {
+      isCurrent = false;
+    };
   }, [currentChatId]);
 
   // Find active chat and active agent details
   const currentChat = chats.find((c) => c.id === currentChatId) || null;
+  const roleAgents = agents.filter((a) => a.role === currentRole || (!a.role && currentRole === 'staff'));
   const activeAgent =
-    agents.find((a) => a.id === currentChat?.active_agent_id) ||
-    agents[0] ||
+    roleAgents.find((a) => a.id === currentChat?.active_agent_id) ||
+    roleAgents[0] ||
     null;
 
   // Sync active agent in chat record if it was null or defaulted
@@ -58,21 +73,53 @@ export default function App() {
     }
   }, [currentChatId, activeAgent]);
 
+  // Handle role switching
+  const handleRoleChange = (role: 'staff' | 'manager' | 'director') => {
+    setCurrentRole(role);
+    
+    // Auto-select the first conversation of the new role (if exists)
+    const roleChats = chats.filter((c) => c.role === role || (!c.role && role === 'staff'));
+    if (roleChats.length > 0) {
+      setCurrentChatId(roleChats[0].id);
+    } else {
+      setCurrentChatId(null);
+    }
+
+    // Role-specific theme colors for the confetti burst
+    const colors = 
+      role === 'staff' ? ['#06b6d4', '#3b82f6'] :
+      role === 'manager' ? ['#10b981', '#84cc16'] :
+      ['#d946ef', '#f43f5e'];
+
+    confetti({
+      particleCount: 30,
+      spread: 50,
+      origin: { y: 0.9, x: 0.15 }, // Trigger near the role switcher
+      colors: colors,
+    });
+  };
+
   // Create a new conversation
   const handleCreateChat = async () => {
-    const defaultAgent = agents[0] || null;
-    const title = `New Session ${chats.length + 1}`;
-    const newChat = await dbService.createChat(title, defaultAgent?.id);
+    const defaultAgent = roleAgents[0] || null;
+    const currentRoleChats = chats.filter((c) => c.role === currentRole || (!c.role && currentRole === 'staff'));
+    const title = `New Session ${currentRoleChats.length + 1}`;
+    const newChat = await dbService.createChat(title, defaultAgent?.id, currentRole);
     
     setChats((prev) => [newChat, ...prev]);
     setCurrentChatId(newChat.id);
 
-    // Micro-animation! Confetti effect on starting a new chat
+    // Dynamic confetti colors based on role
+    const colors = 
+      currentRole === 'staff' ? ['#06b6d4', '#3b82f6'] :
+      currentRole === 'manager' ? ['#10b981', '#84cc16'] :
+      ['#d946ef', '#f43f5e'];
+
     confetti({
       particleCount: 50,
       spread: 60,
       origin: { y: 0.8 },
-      colors: ['#6366f1', '#ec4899', '#06b6d4'],
+      colors: colors,
     });
   };
 
@@ -92,7 +139,7 @@ export default function App() {
     setChats((prev) => prev.filter((c) => c.id !== id));
     
     if (currentChatId === id) {
-      const remainingChats = chats.filter((c) => c.id !== id);
+      const remainingChats = chats.filter((c) => c.id !== id && (c.role === currentRole || (!c.role && currentRole === 'staff')));
       setCurrentChatId(remainingChats.length > 0 ? remainingChats[0].id : null);
     }
   };
@@ -108,7 +155,7 @@ export default function App() {
       const title = currentChat?.title || 'Chat';
       const agentId = currentChat?.active_agent_id;
       
-      const newChat = await dbService.createChat(title, agentId);
+      const newChat = await dbService.createChat(title, agentId, currentRole);
       setChats((prev) => prev.map((c) => (c.id === currentChatId ? newChat : c)));
       setCurrentChatId(newChat.id);
     }
@@ -116,7 +163,11 @@ export default function App() {
 
   // Save or edit Agent configuration
   const handleSaveAgent = async (agentData: Omit<Agent, 'id'> & { id?: string }) => {
-    await dbService.saveAgent(agentData);
+    const dataWithRole = {
+      ...agentData,
+      role: agentData.role || currentRole,
+    };
+    await dbService.saveAgent(dataWithRole);
     const updatedAgents = await dbService.getAgents();
     setAgents(updatedAgents);
     setEditingAgent(null);
@@ -316,7 +367,6 @@ export default function App() {
 
     try {
       // 2. Query Agent API
-      // We pass activeAgent, the previous message history, and the new query
       const replyText = await queryAgentAPI(activeAgent, messages, text);
 
       // 3. Save Agent response
@@ -338,25 +388,12 @@ export default function App() {
         setChats((prev) =>
           prev.map((c) => (c.id === currentChatId ? updatedChat : c))
         );
-        // Rename in database
-        if (dbService.isSupabase()) {
-          // Trigger async update in Supabase
-          dbService.createChat(shortTitle, currentChat.active_agent_id).then(() => {
-            // Note: Since we don't have updateChatTitle in dbService yet, we can update it locally
-            // or add it. Let's make dbService robust so the title persists.
-          });
-        } else {
-          const localChats = JSON.parse(localStorage.getItem('chat_client_chats') || '[]');
-          const idx = localChats.findIndex((c: any) => c.id === currentChatId);
-          if (idx >= 0) {
-            localChats[idx].title = shortTitle;
-            localStorage.setItem('chat_client_chats', JSON.stringify(localChats));
-          }
-        }
+        // Rename in database (update existing chat title, don't create a new one)
+        dbService.updateChatTitle(currentChatId, shortTitle);
       }
     } catch (err: any) {
       console.error(err);
-      
+
       // Save error message to thread
       const errMsg = await dbService.saveMessage({
         chat_id: currentChatId,
@@ -371,10 +408,10 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container theme-${currentRole}`}>
       <Sidebar
-        chats={chats}
-        agents={agents}
+        chats={chats.filter((c) => c.role === currentRole || (!c.role && currentRole === 'staff'))}
+        agents={agents.filter((a) => a.role === currentRole || (!a.role && currentRole === 'staff'))}
         currentChatId={currentChatId}
         onSelectChat={setCurrentChatId}
         onCreateChat={handleCreateChat}
@@ -388,17 +425,20 @@ export default function App() {
           setIsModalOpen(true);
         }}
         onDeleteAgent={handleDeleteAgent}
+        currentRole={currentRole}
+        onRoleChange={handleRoleChange}
       />
 
       <ChatArea
         chat={currentChat}
         messages={messages}
-        agents={agents}
+        agents={agents.filter((a) => a.role === currentRole || (!a.role && currentRole === 'staff'))}
         activeAgent={activeAgent}
         isGenerating={isGenerating}
         onSendMessage={handleSendMessage}
         onChangeAgent={handleSelectAgent}
         onClearHistory={handleClearHistory}
+        currentRole={currentRole}
       />
 
       <AgentModal
@@ -409,6 +449,7 @@ export default function App() {
         }}
         onSave={handleSaveAgent}
         editingAgent={editingAgent}
+        currentRole={currentRole}
       />
     </div>
   );

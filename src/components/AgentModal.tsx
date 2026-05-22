@@ -7,6 +7,7 @@ interface AgentModalProps {
   onClose: () => void;
   onSave: (agent: Omit<Agent, 'id'> & { id?: string }) => void;
   editingAgent: Agent | null;
+  currentRole: 'staff' | 'manager' | 'director';
 }
 
 export const AgentModal: React.FC<AgentModalProps> = ({
@@ -14,6 +15,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
   onClose,
   onSave,
   editingAgent,
+  currentRole,
 }) => {
   const [name, setName] = useState('');
   const [provider, setProvider] = useState<Agent['api_provider']>('gemini');
@@ -21,6 +23,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [instruction, setInstruction] = useState('');
+  const [role, setRole] = useState<Agent['role']>('staff');
   const [error, setError] = useState('');
 
   // Pre-fill defaults based on provider
@@ -54,6 +57,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
       setApiKey(editingAgent.api_key || '');
       setModel(editingAgent.model_name || '');
       setInstruction(editingAgent.system_instruction || '');
+      setRole(editingAgent.role || 'staff');
     } else {
       setName('');
       setProvider('gemini');
@@ -61,9 +65,10 @@ export const AgentModal: React.FC<AgentModalProps> = ({
       setApiKey('');
       setModel('gemini-1.5-flash');
       setInstruction('');
+      setRole(currentRole);
     }
     setError('');
-  }, [editingAgent, isOpen]);
+  }, [editingAgent, isOpen, currentRole]);
 
   if (!isOpen) return null;
 
@@ -86,6 +91,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
       api_key: apiKey.trim() || undefined,
       model_name: model.trim() || undefined,
       system_instruction: instruction.trim() || undefined,
+      role: role,
     });
     onClose();
   };
@@ -120,6 +126,18 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               onChange={(e) => setName(e.target.value)}
               required
             />
+          </div>
+
+          <div className="form-group">
+            <label>Workspace Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as Agent['role'])}
+            >
+              <option value="staff">Staff Workspace</option>
+              <option value="manager">Manager Workspace</option>
+              <option value="director">Director Workspace</option>
+            </select>
           </div>
 
           <div className="form-row">

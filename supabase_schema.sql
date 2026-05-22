@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.agents (
     api_key TEXT,
     model_name TEXT,
     system_instruction TEXT,
+    role TEXT CHECK (role IN ('staff', 'manager', 'director')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.chats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     active_agent_id UUID REFERENCES public.agents(id) ON DELETE SET NULL,
+    role TEXT CHECK (role IN ('staff', 'manager', 'director')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -45,34 +47,36 @@ ALTER TABLE public.agents DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
 
--- Insertion of a default Mock Agent so the database is not empty
-INSERT INTO public.agents (name, api_provider, model_name, system_instruction)
-VALUES (
-    'Mock Assistant',
-    'mock',
-    'mock-v1',
-    'You are a helpful Mock Agent that simulates responses to help test the UI.'
-) ON CONFLICT DO NOTHING;
+-- Insertion of default Mock Agents for each role
+INSERT INTO public.agents (id, name, api_provider, model_name, role, system_instruction)
+VALUES 
+  ('00000000-0000-0000-0000-000000000001'::uuid, 'Staff Assistant', 'mock', 'mock-v1', 'staff', 'You are the Staff Assistant. You help staff members with daily operations, coding, documentation, and technical support. Keep answers detail-oriented, helpful, and highly practical.'),
+  ('00000000-0000-0000-0000-000000000002'::uuid, 'Manager Assistant', 'mock', 'mock-v1', 'manager', 'You are the Manager Assistant. You assist managers in project coordination, scheduling, reviewing team updates, managing risk, and streamlining workflows.'),
+  ('00000000-0000-0000-0000-000000000003'::uuid, 'Director Assistant', 'mock', 'mock-v1', 'director', 'You are the Director Assistant. You advise directors on high-level strategy, business growth, organizational changes, executive communication, and strategic investments. Keep responses concise, leadership-focused, and highly professional.')
+ON CONFLICT (id) DO UPDATE 
+SET 
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  system_instruction = EXCLUDED.system_instruction;
 
 -- ============================================================
--- MIGRATION: Run these commands if the table already exists
--- (to add 'softnix' to the provider constraint and update the agent)
+-- MIGRATION: Run these commands if tables already exist
 -- ============================================================
 
--- Step 1: Drop old CHECK constraint (name may vary; use the query below to find it)
--- SELECT conname FROM pg_constraint WHERE conrelid = 'public.agents'::regclass AND contype = 'c';
-ALTER TABLE public.agents DROP CONSTRAINT IF EXISTS agents_api_provider_check;
+-- Step 1: Add role column to agents table if it doesn't exist
+ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS role TEXT CHECK (role IN ('staff', 'manager', 'director'));
 
--- Step 2: Add updated CHECK constraint with 'softnix' included
-ALTER TABLE public.agents
-  ADD CONSTRAINT agents_api_provider_check
-  CHECK (api_provider IN ('gemini', 'openai', 'custom', 'mock', 'softnix'));
+-- Step 2: Add role column to chats table if it doesn't exist
+ALTER TABLE public.chats ADD COLUMN IF NOT EXISTS role TEXT CHECK (role IN ('staff', 'manager', 'director'));
 
--- Step 3: Update the Softnix AI Agent record to use the correct provider
-UPDATE public.agents
-SET
-  api_provider = 'softnix',
-  name         = 'Softnix AI Agent'
-WHERE
-  api_endpoint = 'https://genai.softnix.ai/external/api/chat-messages'
-  AND api_provider = 'custom';
+-- Step 3: Insert/update the default agents
+INSERT INTO public.agents (id, name, api_provider, model_name, role, system_instruction)
+VALUES 
+  ('00000000-0000-0000-0000-000000000001'::uuid, 'Staff Assistant', 'mock', 'mock-v1', 'staff', 'You are the Staff Assistant. You help staff members with daily operations, coding, documentation, and technical support. Keep answers detail-oriented, helpful, and highly practical.'),
+  ('00000000-0000-0000-0000-000000000002'::uuid, 'Manager Assistant', 'mock', 'mock-v1', 'manager', 'You are the Manager Assistant. You assist managers in project coordination, scheduling, reviewing team updates, managing risk, and streamlining workflows.'),
+  ('00000000-0000-0000-0000-000000000003'::uuid, 'Director Assistant', 'mock', 'mock-v1', 'director', 'You are the Director Assistant. You advise directors on high-level strategy, business growth, organizational changes, executive communication, and strategic investments. Keep responses concise, leadership-focused, and highly professional.')
+ON CONFLICT (id) DO UPDATE 
+SET 
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  system_instruction = EXCLUDED.system_instruction;

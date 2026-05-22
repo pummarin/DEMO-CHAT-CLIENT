@@ -6,6 +6,9 @@ import {
   Edit2,
   Database,
   Cloud,
+  Briefcase,
+  Users,
+  Award,
 } from 'lucide-react';
 import { type Chat, type Agent, dbService } from '../dbService';
 
@@ -19,6 +22,8 @@ interface SidebarProps {
   onAddAgent: () => void;
   onEditAgent: (agent: Agent) => void;
   onDeleteAgent: (id: string) => void;
+  currentRole: 'staff' | 'manager' | 'director';
+  onRoleChange: (role: 'staff' | 'manager' | 'director') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -31,6 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddAgent,
   onEditAgent,
   onDeleteAgent,
+  currentRole,
+  onRoleChange,
 }) => {
   const isSupabase = dbService.isSupabase();
 
@@ -42,6 +49,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Bot className="logo-icon" size={24} />
           <h1>Demo Chat</h1>
         </div>
+
+        {/* Premium Role Switcher */}
+        <div className="role-switcher-container">
+          <div className={`role-slider active-${currentRole}`} />
+          <button
+            className={`role-tab ${currentRole === 'staff' ? 'active' : ''}`}
+            onClick={() => onRoleChange('staff')}
+          >
+            <Briefcase size={14} />
+            <span>Staff</span>
+          </button>
+          <button
+            className={`role-tab ${currentRole === 'manager' ? 'active' : ''}`}
+            onClick={() => onRoleChange('manager')}
+          >
+            <Users size={14} />
+            <span>Manager</span>
+          </button>
+          <button
+            className={`role-tab ${currentRole === 'director' ? 'active' : ''}`}
+            onClick={() => onRoleChange('director')}
+          >
+            <Award size={14} />
+            <span>Director</span>
+          </button>
+        </div>
+
         <button className="btn-primary new-chat-btn" onClick={onCreateChat}>
           <Plus size={16} />
           <span>New Chat</span>
@@ -64,9 +98,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               chats.map((chat) => (
                 <div
                   key={chat.id}
-                  className={`list-item chat-item ${
-                    currentChatId === chat.id ? 'active' : ''
-                  }`}
+                  className={`list-item chat-item ${currentChatId === chat.id ? 'active' : ''
+                    }`}
                   onClick={() => onSelectChat(chat.id)}
                 >
                   <MessageSquare size={16} className="item-icon" />
@@ -220,6 +253,66 @@ export const Sidebar: React.FC<SidebarProps> = ({
           gap: 8px;
           width: 100%;
           font-size: 0.9rem;
+        }
+
+        /* Premium Role Switcher */
+        .role-switcher-container {
+          position: relative;
+          display: flex;
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px solid var(--glass-border);
+          border-radius: 12px;
+          padding: 3px;
+          gap: 2px;
+        }
+
+        .role-slider {
+          position: absolute;
+          top: 3px;
+          bottom: 3px;
+          width: calc((100% - 10px) / 3);
+          border-radius: 9px;
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 1;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .role-slider.active-staff {
+          transform: translateX(0);
+        }
+
+        .role-slider.active-manager {
+          transform: translateX(calc(100% + 2px));
+        }
+
+        .role-slider.active-director {
+          transform: translateX(calc(200% + 4px));
+        }
+
+        .role-tab {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 8px 0;
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          background: transparent;
+          border-radius: 9px;
+          cursor: pointer;
+          z-index: 2;
+          transition: color 0.2s ease;
+          font-weight: 600;
+        }
+
+        .role-tab:hover {
+          color: var(--text-primary);
+        }
+
+        .role-tab.active {
+          color: #ffffff;
         }
 
         .sidebar-content {

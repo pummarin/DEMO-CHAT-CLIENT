@@ -9,6 +9,7 @@ export interface Agent {
   model_name?: string;
   system_instruction?: string;
   created_at?: string;
+  role?: 'staff' | 'manager' | 'director';
 }
 
 export interface Chat {
@@ -16,6 +17,7 @@ export interface Chat {
   title: string;
   active_agent_id?: string;
   created_at?: string;
+  role?: 'staff' | 'manager' | 'director';
 }
 
 export interface Message {
@@ -28,14 +30,35 @@ export interface Message {
   created_at?: string;
 }
 
-// Default Mock Agent to use when the database/localStorage is empty
-const DEFAULT_MOCK_AGENT: Agent = {
-  id: 'mock-agent-id-default',
-  name: 'Mock Assistant',
+// Default Mock Agents to use when the database/localStorage is empty
+const DEFAULT_STAFF_AGENT: Agent = {
+  id: '00000000-0000-0000-0000-000000000001',
+  name: 'Staff Assistant',
   api_provider: 'mock',
   model_name: 'mock-v1',
-  system_instruction: 'You are a helpful Mock Agent that simulates responses to help test the UI.',
+  role: 'staff',
+  system_instruction: 'You are the Staff Assistant. You help staff members with daily operations, coding, documentation, and technical support. Keep answers detail-oriented, helpful, and highly practical.',
 };
+
+const DEFAULT_MANAGER_AGENT: Agent = {
+  id: '00000000-0000-0000-0000-000000000002',
+  name: 'Manager Assistant',
+  api_provider: 'mock',
+  model_name: 'mock-v1',
+  role: 'manager',
+  system_instruction: 'You are the Manager Assistant. You assist managers in project coordination, scheduling, reviewing team updates, managing risk, and streamlining workflows.',
+};
+
+const DEFAULT_DIRECTOR_AGENT: Agent = {
+  id: '00000000-0000-0000-0000-000000000003',
+  name: 'Director Assistant',
+  api_provider: 'mock',
+  model_name: 'mock-v1',
+  role: 'director',
+  system_instruction: 'You are the Director Assistant. You advise directors on high-level strategy, business growth, organizational changes, executive communication, and strategic investments. Keep responses concise, leadership-focused, and highly professional.',
+};
+
+const DEFAULT_AGENTS = [DEFAULT_STAFF_AGENT, DEFAULT_MANAGER_AGENT, DEFAULT_DIRECTOR_AGENT];
 
 // Helper for generating UUIDs in localStorage fallback mode
 const generateUUID = () => {
@@ -51,8 +74,8 @@ const localStorageDb = {
   getAgents: (): Agent[] => {
     const data = localStorage.getItem('chat_client_agents');
     if (!data) {
-      localStorage.setItem('chat_client_agents', JSON.stringify([DEFAULT_MOCK_AGENT]));
-      return [DEFAULT_MOCK_AGENT];
+      localStorage.setItem('chat_client_agents', JSON.stringify(DEFAULT_AGENTS));
+      return DEFAULT_AGENTS;
     }
     return JSON.parse(data);
   },
@@ -92,13 +115,14 @@ const localStorageDb = {
     return data ? JSON.parse(data) : [];
   },
 
-  createChat: (title: string, activeAgentId?: string): Chat => {
+  createChat: (title: string, activeAgentId?: string, role?: 'staff' | 'manager' | 'director'): Chat => {
     const chats = localStorageDb.getChats();
     const newChat: Chat = {
       id: generateUUID(),
       title,
       active_agent_id: activeAgentId,
       created_at: new Date().toISOString(),
+      role,
     };
     chats.unshift(newChat); // Put new chat at top
     localStorage.setItem('chat_client_chats', JSON.stringify(chats));
@@ -110,6 +134,15 @@ const localStorageDb = {
     const index = chats.findIndex((c) => c.id === chatId);
     if (index >= 0) {
       chats[index].active_agent_id = agentId;
+      localStorage.setItem('chat_client_chats', JSON.stringify(chats));
+    }
+  },
+
+  updateChatTitle: (chatId: string, title: string): void => {
+    const chats = localStorageDb.getChats();
+    const index = chats.findIndex((c) => c.id === chatId);
+    if (index >= 0) {
+      chats[index].title = title;
       localStorage.setItem('chat_client_chats', JSON.stringify(chats));
     }
   },
@@ -184,6 +217,7 @@ export const dbService = {
           api_key: agent.api_key,
           model_name: agent.model_name,
           system_instruction: agent.system_instruction,
+          role: agent.role,
         })
         .select()
         .single();
@@ -224,20 +258,20 @@ export const dbService = {
     return localStorageDb.getChats();
   },
 
-  createChat: async (title: string, activeAgentId?: string): Promise<Chat> => {
+  createChat: async (title: string, activeAgentId?: string, role?: 'staff' | 'manager' | 'director'): Promise<Chat> => {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from('chats')
-        .insert({ title, active_agent_id: activeAgentId || null })
+        .insert({ title, active_agent_id: activeAgentId || null, role: role || null })
         .select()
         .single();
       if (error) {
         console.error('Supabase error, falling back to LocalStorage:', error);
-        return localStorageDb.createChat(title, activeAgentId);
+        return localStorageDb.createChat(title, activeAgentId, role);
       }
       return data;
     }
-    return localStorageDb.createChat(title, activeAgentId);
+    return localStorageDb.createChat(title, activeAgentId, role);
   },
 
   updateChatAgent: async (chatId: string, agentId: string | undefined): Promise<void> => {
@@ -253,6 +287,21 @@ export const dbService = {
       return;
     }
     localStorageDb.updateChatAgent(chatId, agentId);
+  },
+
+  updateChatTitle: async (chatId: string, title: string): Promise<void> => {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from('chats')
+        .update({ title })
+        .eq('id', chatId);
+      if (error) {
+        console.error('Supabase error, falling back to LocalStorage:', error);
+        localStorageDb.updateChatTitle(chatId, title);
+      }
+      return;
+    }
+    localStorageDb.updateChatTitle(chatId, title);
   },
 
   deleteChat: async (id: string): Promise<void> => {
