@@ -339,6 +339,9 @@ export default function App() {
         endpointUrl = endpointUrl.replace('https://genai.softnix.ai/external/api', '/api/softnix');
       }
 
+      // Toggle this flag to switch between streaming and blocking modes
+      const useStreaming = false;
+
       const response = await fetch(endpointUrl, {
         method: 'POST',
         headers: {
@@ -350,8 +353,7 @@ export default function App() {
           inputs: {},
           files: [],
           citation: true,
-          // response_mode: onChunk ? 'streaming' : 'blocking',
-          response_mode: 'blocking',
+          response_mode: useStreaming ? 'streaming' : 'blocking',
         }),
       });
 
@@ -360,7 +362,7 @@ export default function App() {
         throw new Error(errJson.message || errJson.error || `HTTP ${response.status} Error`);
       }
 
-      if (onChunk && response.body) {
+      if (useStreaming && onChunk && response.body) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
