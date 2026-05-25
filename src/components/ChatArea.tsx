@@ -84,7 +84,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
 
     // Bold text **text**
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
+
     // Italic text *text* or _text_
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
     html = html.replace(/_(.*?)_/g, '<em>$1</em>');
@@ -261,7 +261,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 -- Switch Agent --
               </option>
               {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
+                <option key={agent.id} value={agent.id} style={{ color: 'black' }}>
                   {agent.name} ({agent.api_provider.toUpperCase()})
                 </option>
               ))}
@@ -299,9 +299,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             return (
               <div
                 key={msg.id}
-                className={`message-bubble-wrapper ${
-                  msg.sender === 'user' ? 'user-wrapper' : 'agent-wrapper'
-                }`}
+                className={`message-bubble-wrapper ${msg.sender === 'user' ? 'user-wrapper' : 'agent-wrapper'
+                  }`}
               >
                 <div className="sender-avatar">
                   {msg.sender === 'user' ? (
@@ -319,9 +318,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <span className="timestamp">
                       {msg.created_at
                         ? new Date(msg.created_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
                         : ''}
                     </span>
                     {msg.statusText && (
