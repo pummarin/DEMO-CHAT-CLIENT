@@ -287,9 +287,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         ) : (
           messages.map((msg) => {
-            if (msg.id.startsWith('temp-') && !msg.content) {
+            if (msg.id.startsWith('temp-') && !msg.content && !msg.statusText) {
               return null;
             }
+
             return (
               <div
                 key={msg.id}
@@ -318,10 +319,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           })
                         : ''}
                     </span>
+                    {msg.statusText && (
+                      <span className="thinking-status">
+                        <span className="status-pulse-dot"></span>
+                        <span>{msg.statusText}</span>
+                      </span>
+                    )}
                   </div>
 
-                  <div className="message-bubble">
-                    <Markdown content={msg.content} />
+                  <div className={`message-bubble ${!msg.content ? 'loading-bubble' : ''}`}>
+                    {msg.content ? (
+                      <Markdown content={msg.content} />
+                    ) : (
+                      <>
+                        <span className="typing-dot"></span>
+                        <span className="typing-dot"></span>
+                        <span className="typing-dot"></span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -329,7 +344,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           })
         )}
 
-        {isGenerating && !messages.some((m) => m.id.startsWith('temp-') && m.content.length > 0) && (
+        {isGenerating && !messages.some((m) => m.id.startsWith('temp-')) && (
           <div className="message-bubble-wrapper agent-wrapper generating">
             <div className="sender-avatar">
               <Bot size={14} className="agent-avatar-icon rotate-anim" />
@@ -601,6 +616,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         .timestamp {
           font-size: 0.7rem;
           color: var(--text-muted);
+        }
+
+        .thinking-status {
+          font-size: 0.72rem;
+          color: var(--primary);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 8px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--glass-border);
+          border-radius: 99px;
+          margin-left: 6px;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.05);
+          animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        .status-pulse-dot {
+          width: 6px;
+          height: 6px;
+          background-color: var(--primary);
+          border-radius: 50%;
+          display: inline-block;
+          box-shadow: 0 0 6px var(--primary);
         }
 
         .message-bubble {

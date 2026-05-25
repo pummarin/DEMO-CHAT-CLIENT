@@ -28,6 +28,7 @@ export interface Message {
   agent_name?: string;
   content: string;
   created_at?: string;
+  statusText?: string;
 }
 
 // Default Mock Agents to use when the database/localStorage is empty

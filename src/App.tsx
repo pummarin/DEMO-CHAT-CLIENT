@@ -367,6 +367,27 @@ export default function App() {
         const decoder = new TextDecoder();
         let buffer = '';
         let fullText = '';
+        let hasStatus = false;
+
+        const getFriendlyStatus = (status: string): string => {
+          const s = status.replace('Process: ', '').trim();
+          switch (s) {
+            case '_start_':
+              return 'เริ่มต้นขั้นตอนการทำงาน';
+            case 'message_analyzer':
+              return 'กำลังวิเคราะห์เนื้อหาคำถาม';
+            case 'main_agent':
+              return 'กำลังประมวลผลคำสั่งงานและวางแผน';
+            case 'ChatAIMessage':
+              return 'กำลังจัดเตรียมข้อมูลแชต';
+            case 'call_tools':
+              return 'กำลังเลือกใช้เครื่องมือหลังบ้าน';
+            case 'ApiCustomTool':
+              return 'กำลังค้นหาและดึงข้อมูลใบสั่งซื้อ (PO) จากฐานข้อมูลระบบ';
+            default:
+              return s;
+          }
+        };
 
         while (true) {
           const { value, done } = await reader.read();
@@ -386,7 +407,19 @@ export default function App() {
 
               try {
                 const data = JSON.parse(dataStr);
+                
+                // Display Agent reasoning/thinking steps in real-time
+                if (data.status && !fullText) {
+                  hasStatus = true;
+                  onChunk(`Status: ${getFriendlyStatus(data.status)}`);
+                }
+
                 if (data.event === 'message' && data.answer) {
+                  // If real answer starts printing, clear the temporary status
+                  if (hasStatus) {
+                    onChunk('[CLEAR_STATUS]');
+                    hasStatus = false;
+                  }
                   fullText += data.answer;
                   onChunk(data.answer);
                 }
@@ -448,6 +481,30 @@ export default function App() {
       // 2. Query Agent API with chunk callback
       let streamedContent = '';
       const replyText = await queryAgentAPI(activeAgent, messages, text, (chunk) => {
+        if (chunk.startsWith('Status: ')) {
+          const statusTextVal = chunk.replace('Status: ', '');
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === tempAgentMsgId 
+                ? { ...msg, statusText: statusTextVal } 
+                : msg
+            )
+          );
+          return;
+        }
+
+        if (chunk === '[CLEAR_STATUS]') {
+          streamedContent = '';
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === tempAgentMsgId 
+                ? { ...msg, statusText: undefined } 
+                : msg
+            )
+          );
+          return;
+        }
+
         streamedContent += chunk;
         setMessages((prev) =>
           prev.map((msg) =>
