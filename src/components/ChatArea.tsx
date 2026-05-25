@@ -50,7 +50,12 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
       // Numbered lists
       const numListMatch = line.trim().match(/^(\d+)\.\s(.*)/);
       if (numListMatch) {
-        return <li key={idx} className="md-ol-li" data-index={numListMatch[1]} dangerouslySetInnerHTML={{ __html: parseInline(numListMatch[2]) }} />;
+        return (
+          <li key={idx} className="md-ol-li">
+            <span className="md-ol-number">{numListMatch[1]}.</span>
+            <span className="md-ol-content" dangerouslySetInnerHTML={{ __html: parseInline(numListMatch[2]) }} />
+          </li>
+        );
       }
 
       // Empty line -> break/spacing
@@ -780,9 +785,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           margin-bottom: 4px;
         }
         .md-ol-li {
-          margin-left: 20px;
-          list-style-type: decimal;
+          display: flex;
+          align-items: flex-start;
+          gap: 0.25rem;
+          margin-left: 0;
           margin-bottom: 4px;
+          list-style-type: none;
+        }
+        .md-ol-number {
+          font-weight: 600;
+          color: var(--text-primary);
+          flex-shrink: 0;
+          min-width: 1.25rem;
+        }
+        .md-ol-content {
+          flex: 1;
         }
         .md-space {
           height: 8px;
