@@ -27,46 +27,176 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
   // Render text with simple markdown parsing (headers, lists, bold, inline code, paragraphs)
   const renderTextWithFormatting = (text: string) => {
     const lines = text.split('\n');
-    return lines.map((line, idx) => {
-      let parsedLine = line;
+    const elements: React.ReactNode[] = [];
 
-      // Headers
-      if (line.startsWith('### ')) {
-        return <h4 key={idx} className="md-h4">{line.substring(4)}</h4>;
+    const isTableSeparator = (line: string): boolean => {
+      const trimmed = line.trim();
+      return /^[|:\s-]+$/.test(trimmed) && trimmed.includes('|') && trimmed.includes('-');
+    };
+
+    const isTableRow = (line: string): boolean => {
+      const trimmed = line.trim();
+      return trimmed.includes('|') && trimmed.length > 0;
+    };
+
+    const parseTableRow = (line: string): string[] => {
+      const trimmed = line.trim();
+      let parts = trimmed.split('|');
+      
+      // If the row starts with a pipe, the first element after split is empty.
+      if (parts[0] === '') {
+        parts = parts.slice(1);
       }
-      if (line.startsWith('## ')) {
-        return <h3 key={idx} className="md-h3">{line.substring(3)}</h3>;
+      // If the row ends with a pipe, the last element after split is empty.
+      if (parts[parts.length - 1] === '') {
+        parts = parts.slice(0, -1);
       }
-      if (line.startsWith('# ')) {
-        return <h2 key={idx} className="md-h2">{line.substring(2)}</h2>;
+      
+      return parts.map(cell => cell.trim());
+    };
+
+    const parseTableSeparator = (line: string): ('left' | 'center' | 'right')[] => {
+      const cells = parseTableRow(line);
+      return cells.map(cell => {
+        const hasLeftColon = cell.startsWith(':');
+        const hasRightColon = cell.endsWith(':');
+        if (hasLeftColon && hasRightColon) return 'center';
+        if (hasRightColon) return 'right';
+        return 'left';
+      });
+    };
+
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Check if it's the start of a table
+      if (
+        i + 1 < lines.length &&
+        isTableRow(line) &&
+        isTableSeparator(lines[i + 1])
+      ) {
+        const headers = parseTableRow(line);
+        const alignments = parseTableSeparator(lines[i + 1]);
+        const rows: string[][] = [];
+        const numCols = headers.length;
+        
+        i += 2; // skip header and separator
+        while (i < lines.length && isTableRow(lines[i]) && !isTableSeparator(lines[i])) {
+          const rawRow = parseTableRow(lines[i]);
+          // Pad or truncate row to match headers length
+          const row = Array.from({ length: numCols }, (_, colIdx) => rawRow[colIdx] || '');
+          rows.push(row);
+          i++;
+        }
+
+        elements.push(
+          <div key={`table-${i}`} className="md-table-wrapper">
+            <table className="md-table">
+              <thead>
+                <tr>
+                  {headers.map((header, colIdx) => (
+                    <th
+                      key={colIdx}
+                      style={{ textAlign: alignments[colIdx] || 'left' }}
+                      dangerouslySetInnerHTML={{ __html: parseInline(header) }}
+                    />
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, rowIdx) => (
+                  <tr key={rowIdx}>
+                    {row.map((cell, colIdx) => (
+                      <td
+                        key={colIdx}
+                        style={{ textAlign: alignments[colIdx] || 'left' }}
+                        dangerouslySetInnerHTML={{ __html: parseInline(cell) }}
+                      />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
       }
 
-      // Bullet points
-      if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-        const cleanContent = line.trim().substring(2);
-        return <li key={idx} className="md-li" dangerouslySetInnerHTML={{ __html: parseInline(cleanContent) }} />;
+      // Bullet lists
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        const listItems: string[] = [];
+        while (i < lines.length && (lines[i].trim().startsWith('* ') || lines[i].trim().startsWith('- '))) {
+          listItems.push(lines[i].trim().substring(2));
+          i++;
+        }
+        elements.push(
+          <ul key={`ul-${i}`} className="md-ul">
+            {listItems.map((item, idx) => (
+              <li key={idx} dangerouslySetInnerHTML={{ __html: parseInline(item) }} />
+            ))}
+          </ul>
+        );
+        continue;
       }
 
       // Numbered lists
-      const numListMatch = line.trim().match(/^(\d+)\.\s(.*)/);
+      const numListMatch = trimmed.match(/^(\d+)\.\s(.*)/);
       if (numListMatch) {
-        return <li key={idx} className="md-ol-li" data-index={numListMatch[1]} dangerouslySetInnerHTML={{ __html: parseInline(numListMatch[2]) }} />;
+        const listItems: string[] = [];
+        while (i < lines.length) {
+          const match = lines[i].trim().match(/^(\d+)\.\s(.*)/);
+          if (!match) break;
+          listItems.push(match[2]);
+          i++;
+        }
+        elements.push(
+          <ol key={`ol-${i}`} className="md-ol">
+            {listItems.map((item, idx) => (
+              <li key={idx} dangerouslySetInnerHTML={{ __html: parseInline(item) }} />
+            ))}
+          </ol>
+        );
+        continue;
+      }
+
+      // Headers
+      if (line.startsWith('### ')) {
+        elements.push(<h4 key={`h4-${i}`} className="md-h4">{line.substring(4)}</h4>);
+        i++;
+        continue;
+      }
+      if (line.startsWith('## ')) {
+        elements.push(<h3 key={`h3-${i}`} className="md-h3">{line.substring(3)}</h3>);
+        i++;
+        continue;
+      }
+      if (line.startsWith('# ')) {
+        elements.push(<h2 key={`h2-${i}`} className="md-h2">{line.substring(2)}</h2>);
+        i++;
+        continue;
       }
 
       // Empty line -> break/spacing
-      if (!line.trim()) {
-        return <div key={idx} className="md-space" />;
+      if (!trimmed) {
+        elements.push(<div key={`space-${i}`} className="md-space" />);
+        i++;
+        continue;
       }
 
       // Standard paragraph
-      return (
+      elements.push(
         <p
-          key={idx}
+          key={`p-${i}`}
           className="md-p"
-          dangerouslySetInnerHTML={{ __html: parseInline(parsedLine) }}
+          dangerouslySetInnerHTML={{ __html: parseInline(line) }}
         />
       );
-    });
+      i++;
+    }
+
+    return elements;
   };
 
   const parseInline = (text: string): string => {
@@ -728,15 +858,61 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           font-weight: 600;
           margin: 10px 0 4px 0;
         }
-        .md-li {
+        .md-ul {
           margin-left: 20px;
           list-style-type: disc;
-          margin-bottom: 4px;
+          margin-bottom: 12px;
         }
-        .md-ol-li {
+        .md-ol {
           margin-left: 20px;
           list-style-type: decimal;
+          margin-bottom: 12px;
+        }
+        .md-ul li, .md-ol li {
           margin-bottom: 4px;
+        }
+
+        /* Table styles */
+        .md-table-wrapper {
+          overflow-x: auto;
+          margin: 16px 0;
+          border-radius: 12px;
+          border: 1px solid var(--glass-border);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .md-table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 0.88rem;
+        }
+
+        .md-table th {
+          background: rgba(255, 255, 255, 0.04);
+          padding: 10px 14px;
+          font-weight: 600;
+          color: var(--text-primary);
+          border-bottom: 1px solid var(--glass-border);
+          font-family: var(--font-display);
+          white-space: nowrap;
+        }
+
+        .md-table td {
+          padding: 10px 14px;
+          color: var(--text-secondary);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          line-height: 1.4;
+          white-space: nowrap;
+        }
+
+        .md-table tr:last-child td {
+          border-bottom: none;
+        }
+
+        .md-table tr:hover td {
+          background: rgba(255, 255, 255, 0.01);
+          color: var(--text-primary);
         }
         .md-space {
           height: 8px;
