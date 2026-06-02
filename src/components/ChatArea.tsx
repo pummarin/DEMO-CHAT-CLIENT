@@ -209,7 +209,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
 
     // Bold text **text**
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
+
     // Italic text *text* or _text_
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
     html = html.replace(/_(.*?)_/g, '<em>$1</em>');
@@ -386,7 +386,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 -- Switch Agent --
               </option>
               {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
+                <option key={agent.id} value={agent.id} style={{ color: 'black' }}>
                   {agent.name} ({agent.api_provider.toUpperCase()})
                 </option>
               ))}
@@ -416,45 +416,64 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </p>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`message-bubble-wrapper ${
-                msg.sender === 'user' ? 'user-wrapper' : 'agent-wrapper'
-              }`}
-            >
-              <div className="sender-avatar">
-                {msg.sender === 'user' ? (
-                  <User size={14} />
-                ) : (
-                  <Bot size={14} className="agent-avatar-icon" />
-                )}
-              </div>
+          messages.map((msg) => {
+            if (msg.id.startsWith('temp-') && !msg.content && !msg.statusText) {
+              return null;
+            }
 
-              <div className="message-bubble-content">
-                <div className="message-header-info">
-                  <span className="sender-name">
-                    {msg.sender === 'user' ? 'You' : msg.agent_name || 'Agent'}
-                  </span>
-                  <span className="timestamp">
-                    {msg.created_at
-                      ? new Date(msg.created_at).toLocaleTimeString([], {
+            return (
+              <div
+                key={msg.id}
+                className={`message-bubble-wrapper ${msg.sender === 'user' ? 'user-wrapper' : 'agent-wrapper'
+                  }`}
+              >
+                <div className="sender-avatar">
+                  {msg.sender === 'user' ? (
+                    <User size={14} />
+                  ) : (
+                    <Bot size={14} className="agent-avatar-icon" />
+                  )}
+                </div>
+
+                <div className="message-bubble-content">
+                  <div className="message-header-info">
+                    <span className="sender-name">
+                      {msg.sender === 'user' ? 'You' : msg.agent_name || 'Agent'}
+                    </span>
+                    <span className="timestamp">
+                      {msg.created_at
+                        ? new Date(msg.created_at).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit',
                         })
-                      : ''}
-                  </span>
-                </div>
+                        : ''}
+                    </span>
+                    {msg.statusText && (
+                      <span className="thinking-status">
+                        <span className="status-pulse-dot"></span>
+                        <span>{msg.statusText}</span>
+                      </span>
+                    )}
+                  </div>
 
-                <div className="message-bubble">
-                  <Markdown content={msg.content} />
+                  <div className={`message-bubble ${!msg.content ? 'loading-bubble' : ''}`}>
+                    {msg.content ? (
+                      <Markdown content={msg.content} />
+                    ) : (
+                      <>
+                        <span className="typing-dot"></span>
+                        <span className="typing-dot"></span>
+                        <span className="typing-dot"></span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
 
-        {isGenerating && (
+        {isGenerating && !messages.some((m) => m.id.startsWith('temp-')) && (
           <div className="message-bubble-wrapper agent-wrapper generating">
             <div className="sender-avatar">
               <Bot size={14} className="agent-avatar-icon rotate-anim" />
@@ -728,6 +747,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           color: var(--text-muted);
         }
 
+        .thinking-status {
+          font-size: 0.72rem;
+          color: var(--primary);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 8px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--glass-border);
+          border-radius: 99px;
+          margin-left: 6px;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.05);
+          animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        .status-pulse-dot {
+          width: 6px;
+          height: 6px;
+          background-color: var(--primary);
+          border-radius: 50%;
+          display: inline-block;
+          box-shadow: 0 0 6px var(--primary);
+        }
+
         .message-bubble {
           padding: 14px 18px;
           border-radius: 18px;
@@ -863,13 +908,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           list-style-type: disc;
           margin-bottom: 12px;
         }
-        .md-ol {
+        .md-ol-li {
           margin-left: 20px;
           list-style-type: decimal;
-          margin-bottom: 12px;
-        }
-        .md-ul li, .md-ol li {
           margin-bottom: 4px;
+          list-style-type: none;
+        }
+        .md-ol-number {
+          font-weight: 600;
+          color: var(--text-primary);
+          flex-shrink: 0;
+          min-width: 1.25rem;
+        }
+        .md-ol-content {
+          flex: 1;
         }
 
         /* Table styles */

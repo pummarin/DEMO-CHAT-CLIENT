@@ -1,0 +1,1 @@
+# Redirect rules are handled by Netlify Edge Functions under netlify/edge-functions/proxy.ts to support streaming.

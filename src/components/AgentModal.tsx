@@ -134,9 +134,9 @@ export const AgentModal: React.FC<AgentModalProps> = ({
               value={role}
               onChange={(e) => setRole(e.target.value as Agent['role'])}
             >
-              <option value="staff">Staff Workspace</option>
-              <option value="manager">Manager Workspace</option>
-              <option value="director">Director Workspace</option>
+              <option value="staff" style={{ color: 'black' }}>Staff Workspace</option>
+              <option value="manager" style={{ color: 'black' }}>Manager Workspace</option>
+              <option value="director" style={{ color: 'black' }}>Director Workspace</option>
             </select>
           </div>
 
@@ -147,11 +147,11 @@ export const AgentModal: React.FC<AgentModalProps> = ({
                 value={provider}
                 onChange={(e) => setProvider(e.target.value as Agent['api_provider'])}
               >
-                <option value="gemini">Gemini API</option>
-                <option value="openai">OpenAI API</option>
-                <option value="softnix">Softnix AI (genai.softnix.ai)</option>
-                <option value="custom">Custom Endpoint (OpenAI Compatible)</option>
-                <option value="mock">Local Simulation (Mock)</option>
+                <option value="gemini" style={{ color: 'black' }}>Gemini API</option>
+                <option value="openai" style={{ color: 'black' }}>OpenAI API</option>
+                <option value="softnix" style={{ color: 'black' }}>Softnix AI (genai.softnix.ai)</option>
+                <option value="custom" style={{ color: 'black' }}>Custom Endpoint (OpenAI Compatible)</option>
+                <option value="mock" style={{ color: 'black' }}>Local Simulation (Mock)</option>
               </select>
             </div>
 
@@ -161,8 +161,8 @@ export const AgentModal: React.FC<AgentModalProps> = ({
                 type="text"
                 placeholder={
                   provider === 'gemini' ? 'gemini-1.5-flash' :
-                  provider === 'softnix' ? 'N/A' :
-                  'gpt-4o-mini'
+                    provider === 'softnix' ? 'N/A' :
+                      'gpt-4o-mini'
                 }
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
